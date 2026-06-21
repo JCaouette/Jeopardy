@@ -72,29 +72,35 @@ Save the file as `.xlsx`. On the game's home screen, click **Load Questions** an
 
 ## Password Gate
 
-The site uses **PBKDF2-SHA-256** (via the browser's built-in Web Crypto API) to protect access. The password is hashed with a random salt and 200,000 iterations — it cannot be reversed from the source code, and brute-forcing it is computationally expensive.
+The site opens on a password screen. Enter the configured password to access the game. The gate uses **PBKDF2-SHA-256** (via the browser's built-in Web Crypto API) with 200,000 iterations — the password cannot be derived from the source code.
 
-### First-time setup
-
-1. Deploy with `SITE_PASS_SALT` and `SITE_PASS_HASH` both empty (the default in `app.js`).
-2. Visit the live site — you'll see a **Host Setup** form instead of the login screen.
-3. Enter your desired password, click **Generate Hash**.
-4. Copy the two output lines and paste them into `app.js`, replacing the empty strings:
-   ```js
-   const SITE_PASS_SALT = 'paste-here';
-   const SITE_PASS_HASH = 'paste-here';
-   ```
-5. Push the updated `app.js` to GitHub. The password gate is now active.
+The password is stored as a hash in the `SITE_PASS_SALT` and `SITE_PASS_HASH` constants at the top of `app.js`.
 
 ### Changing the password
 
-On the live site, click **⚙ Host: change password** (small link below the login box) to open the generator and repeat steps 3–5 above.
+Run this snippet in your browser's developer console (F12 → Console) to generate a new hash:
 
-### Security model
+```js
+(async () => {
+  const pass = prompt('New password:');
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const saltB64 = btoa(String.fromCharCode(...salt));
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name:'PBKDF2', hash:'SHA-256', salt, iterations:200000 }, key, 256);
+  const hash = btoa(String.fromCharCode(...new Uint8Array(bits)));
+  console.log(`SITE_PASS_SALT = '${saltB64}'`);
+  console.log(`SITE_PASS_HASH = '${hash}'`);
+})();
+```
+
+Copy the two output lines into `app.js` (replacing the existing constants) and push the updated file.
+
+### Security notes
 
 - The password itself is never stored anywhere — only the PBKDF2-derived hash.
-- Someone who downloads your `app.js` sees only a base64-encoded hash and salt. Cracking it requires running 200,000 PBKDF2 iterations per guess, which is deliberately slow.
-- This is client-side security: a sufficiently motivated attacker with access to your source can brute-force a weak password. **Use a strong password** (12+ characters, mix of letters/numbers) and it becomes impractical to crack.
+- Someone who downloads your `app.js` sees only a base64 hash and salt. Cracking it requires 200,000 iterations per guess, which is deliberately slow.
+- This is client-side protection — it stops casual peeking, not a determined attacker with source access. **Use a strong password** (12+ characters, mix of letters/numbers) and it becomes impractical to crack.
 - For maximum protection, keep the GitHub repository **private** (requires a paid GitHub plan for Pages, or use Cloudflare Pages on a private repo for free).
 
 ---

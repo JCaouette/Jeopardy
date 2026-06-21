@@ -464,6 +464,8 @@ select option { background: #111; color: var(--white); }
   justify-content: center;
 }
 
+#btn-done-clue { margin-top: 0.4rem; }
+
 .player-response {
   display: flex;
   flex-direction: column;

@@ -78,7 +78,7 @@
 
   <!-- ═══════════════════ CLUE OVERLAY ═══════════════════ -->
   <div id="overlay-clue" class="overlay" role="dialog" aria-modal="true" aria-label="Clue" hidden>
-    <button class="btn btn-outline btn-small overlay-close" id="btn-close-clue" aria-label="Close clue">✕</button>
+    <button class="btn btn-outline btn-small overlay-close" id="btn-close-clue" aria-label="Cancel — return to board without using this question">✕ Cancel</button>
     <div class="clue-box">
       <div id="clue-meta"></div>
       <div id="clue-text"></div>
@@ -90,12 +90,14 @@
       <div id="answer-section" hidden>
         <div id="answer-text"></div>
         <div id="player-buttons"></div>
+        <button class="btn btn-gold btn-large" id="btn-done-clue">Done →</button>
       </div>
     </div>
   </div>
 
   <!-- ═══════════════════ DAILY DOUBLE OVERLAY ═══════════════════ -->
   <div id="overlay-dd" class="overlay" role="dialog" aria-modal="true" aria-label="Daily Double" hidden>
+    <button class="btn btn-outline btn-small overlay-close" id="btn-close-dd" aria-label="Cancel Daily Double">✕</button>
     <div class="dd-box">
       <div class="dd-title">DAILY<br><span class="gold-em">DOUBLE!</span></div>
       <div id="dd-form" hidden>

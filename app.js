@@ -200,6 +200,10 @@ let finalPhase   = 'category'; // 'category' | 'wagers' | 'clue' | 'answer' | 'm
 let finalWagers  = {};          // playerIdx -> number
 let finalCorrect = {};          // playerIdx -> true | false | null
 
+// Round-advance double-click confirmation
+let roundAdvanceConfirm = false;
+let roundAdvanceTimer   = null;
+
 /* ═══════════════════════════════════════════════════════════
    DOM CACHE
    ═══════════════════════════════════════════════════════════ */
@@ -258,6 +262,8 @@ function cacheDOM() {
     ddWagerInput:   document.getElementById('dd-wager-input'),
     ddWagerHint:    document.getElementById('dd-wager-hint'),
     btnDDConfirm:   document.getElementById('btn-dd-confirm'),
+    btnCloseDD:     document.getElementById('btn-close-dd'),
+    btnDoneClue:    document.getElementById('btn-done-clue'),
     // Final
     finalContent: document.getElementById('final-content'),
     // Winner
@@ -281,13 +287,21 @@ function attachListeners() {
   dom.btnResume.addEventListener('click', resumeGame);
   dom.btnNextRound.addEventListener('click', advanceRound);
   dom.btnReveal.addEventListener('click', revealAnswer);
-  dom.btnCloseClue.addEventListener('click', closeClue);
+  dom.btnCloseClue.addEventListener('click', cancelClue);
+  dom.btnDoneClue.addEventListener('click', closeClue);
   dom.btnDDConfirm.addEventListener('click', confirmDD);
+  dom.btnCloseDD.addEventListener('click', cancelDD);
   dom.ddPlayerSelect.addEventListener('change', updateDDHint);
   dom.ddWagerInput.addEventListener('input', updateDDHint);
   dom.btnNewGame.addEventListener('click', resetToHome);
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && !dom.overlayClue.hidden) closeClue();
+    if (e.key === 'Escape') {
+      if (!dom.overlayDD.hidden) cancelDD();
+      else if (!dom.overlayClue.hidden) {
+        if (dom.answerSection.hidden) cancelClue();
+        else closeClue();
+      }
+    }
   });
 }
 
@@ -306,7 +320,10 @@ const LS_KEY = 'jeopardy_v1';
 
 function saveState() {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify({ players, gameData, currentRound, usedCells }));
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      players, gameData, currentRound, usedCells,
+      finalPhase, finalWagers, finalCorrect,
+    }));
   } catch (_) { /* storage quota exceeded — silently skip */ }
 }
 
@@ -319,6 +336,9 @@ function loadState() {
     gameData     = s.gameData     || null;
     currentRound = s.currentRound || 'single';
     usedCells    = s.usedCells    || { single: {}, double: {} };
+    finalPhase   = s.finalPhase   || 'category';
+    finalWagers  = s.finalWagers  || {};
+    finalCorrect = s.finalCorrect || {};
 
     renderPlayerList();
     updateStartBtn();
@@ -385,6 +405,10 @@ function setLoadStatus(msg, cls = '') {
 function handleFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
+  if (typeof XLSX === 'undefined') {
+    setLoadStatus('⚠ SheetJS library not loaded — check your internet connection and reload the page.', 'error');
+    return;
+  }
   setLoadStatus('Parsing…');
   const reader = new FileReader();
   reader.onload = ev => {
@@ -432,9 +456,19 @@ function parseWorkbook(wb) {
 }
 
 function parseRoundSheet(sheet, values, label) {
-  // Expected header: Category | Value | Clue | Answer | Daily Double?
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
   if (rows.length < 2) throw new Error(`${label}: Sheet appears empty`);
+
+  // Map header names to column indices (tolerant of column order changes)
+  const headers = rows[0].map(c => String(c ?? '').trim().toLowerCase());
+  const col = {
+    category: headers.indexOf('category'),
+    clue:     headers.indexOf('clue'),
+    answer:   headers.indexOf('answer'),
+    dd:       headers.findIndex(h => h.startsWith('daily double')),
+  };
+  const missing = Object.entries(col).filter(([, i]) => i === -1).map(([k]) => k);
+  if (missing.length) throw new Error(`${label}: Missing column(s): ${missing.join(', ')}`);
 
   // Strip header, remove fully blank rows, stringify all cells
   const data = rows.slice(1)
@@ -444,9 +478,14 @@ function parseRoundSheet(sheet, values, label) {
   // Fill-down the Category column
   let lastCat = '';
   const filled = data.map(r => {
-    const cat = r[0];
+    const cat = r[col.category];
     if (cat) lastCat = cat;
-    return { category: lastCat, clue: r[2], answer: r[3], dd: r[4].toUpperCase() === 'DAILY DOUBLE' };
+    return {
+      category: lastCat,
+      clue:     r[col.clue]   || '',
+      answer:   r[col.answer] || '',
+      dd:       (r[col.dd] || '').toUpperCase() === 'DAILY DOUBLE',
+    };
   });
 
   // Group by category (preserving insertion order)
@@ -571,13 +610,16 @@ function startNewGame() {
   players.forEach(p => (p.score = 0));
   usedCells    = { single: {}, double: {} };
   currentRound = 'single';
+  finalPhase   = 'category';
+  finalWagers  = {};
+  finalCorrect = {};
   dom.resumeBanner.classList.add('hidden');
   saveState();
   goToRound('single');
 }
 
 function resumeGame() {
-  if (currentRound === 'final') startFinal();
+  if (currentRound === 'final') { showScreen('final'); renderFinalPhase(); }
   else if (currentRound === 'done') showWinner();
   else goToRound(currentRound);
 }
@@ -622,6 +664,22 @@ function renderBoard() {
 }
 
 function advanceRound() {
+  if (!roundAdvanceConfirm) {
+    roundAdvanceConfirm = true;
+    const nextLabel = currentRound === 'single' ? 'DOUBLE JEOPARDY?' : 'FINAL JEOPARDY?';
+    dom.btnNextRound.textContent = nextLabel;
+    dom.btnNextRound.classList.replace('btn-outline', 'btn-gold');
+    roundAdvanceTimer = setTimeout(() => {
+      roundAdvanceConfirm = false;
+      dom.btnNextRound.textContent = 'Next Round →';
+      dom.btnNextRound.classList.replace('btn-gold', 'btn-outline');
+    }, 4000);
+    return;
+  }
+  clearTimeout(roundAdvanceTimer);
+  roundAdvanceConfirm = false;
+  dom.btnNextRound.textContent = 'Next Round →';
+  dom.btnNextRound.classList.replace('btn-gold', 'btn-outline');
   if (currentRound === 'single') goToRound('double');
   else startFinal();
 }
@@ -648,8 +706,9 @@ function showClueOverlay() {
 
   dom.clueMeta.textContent   = `${cat}  |  ${valLabel}`;
   dom.clueText.textContent   = c.clue;
-  dom.clueActions.hidden     = false;
-  dom.answerSection.hidden   = true;
+  dom.clueActions.hidden      = false;
+  dom.answerSection.hidden    = true;
+  dom.btnCloseClue.hidden     = false;
   dom.playerButtons.innerHTML = '';
 
   dom.overlayDD.hidden   = true;
@@ -659,6 +718,7 @@ function showClueOverlay() {
 
 function revealAnswer() {
   dom.clueActions.hidden     = true;
+  dom.btnCloseClue.hidden    = true;
   dom.answerText.textContent = activeClue.answer;
   dom.answerSection.hidden   = false;
   if (activeClue.dd) renderDDResponseButtons();
@@ -726,6 +786,13 @@ function refreshMarkButtonStates() {
   });
 }
 
+function cancelClue() {
+  activeClue    = null;
+  clueMarks     = {};
+  scoreSnapshot = [];
+  dom.overlayClue.hidden = true;
+}
+
 function closeClue() {
   if (activeClue) {
     usedCells[currentRound][`${activeClue.col}-${activeClue.row}`] = true;
@@ -740,6 +807,13 @@ function closeClue() {
 /* ═══════════════════════════════════════════════════════════
    DAILY DOUBLE
    ═══════════════════════════════════════════════════════════ */
+function cancelDD() {
+  activeClue    = null;
+  clueMarks     = {};
+  scoreSnapshot = [];
+  dom.overlayDD.hidden = true;
+}
+
 function openDailyDouble() {
   // Populate player select
   dom.ddPlayerSelect.innerHTML = '';
@@ -1044,6 +1118,9 @@ function resetToHome() {
   players.forEach(p => (p.score = 0));
   usedCells    = { single: {}, double: {} };
   currentRound = 'single';
+  finalPhase   = 'category';
+  finalWagers  = {};
+  finalCorrect = {};
   dom.resumeBanner.classList.add('hidden');
   renderPlayerList();
   updateStartBtn();
