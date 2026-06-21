@@ -1,5 +1,58 @@
 'use strict';
 
+const Audio = (() => {
+  let ctx = null;
+  let muted = JSON.parse(localStorage.getItem('jp_muted') ?? 'false');
+  function getCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  function beep({ freq=440, type='sine', duration=0.18, gain=0.3, decay=0.12 }={}) {
+    if (muted) return;
+    const c = getCtx();
+    const osc = c.createOscillator();
+    const vol = c.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, c.currentTime);
+    vol.gain.setValueAtTime(gain, c.currentTime);
+    vol.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration + decay);
+    osc.connect(vol); vol.connect(c.destination);
+    osc.start(c.currentTime); osc.stop(c.currentTime + duration + decay + 0.05);
+  }
+  function chord(notes, opts={}) { notes.forEach(f => beep({...opts, freq:f})); }
+  return {
+    isMuted: () => muted,
+    toggleMute() { muted = !muted; localStorage.setItem('jp_muted', JSON.stringify(muted)); return muted; },
+    cellSelect()  { beep({ freq:660, type:'triangle', duration:0.08, gain:0.25 }); },
+    clueReveal()  { beep({ freq:880, type:'sine', duration:0.14, gain:0.2, decay:0.18 }); },
+    dailyDouble() {
+      if (muted) return;
+      setTimeout(() => beep({ freq:220, type:'sawtooth', duration:0.12, gain:0.45, decay:0.08 }), 0);
+      setTimeout(() => beep({ freq:440, type:'sawtooth', duration:0.22, gain:0.4,  decay:0.15 }), 130);
+      setTimeout(() => beep({ freq:880, type:'sawtooth', duration:0.3,  gain:0.35, decay:0.2  }), 310);
+    },
+    correct() { chord([523,659,784], { type:'triangle', duration:0.22, gain:0.22, decay:0.28 }); },
+    wrong() {
+      beep({ freq:180, type:'sawtooth', duration:0.28, gain:0.4, decay:0.18 });
+      setTimeout(() => beep({ freq:140, type:'sawtooth', duration:0.35, gain:0.35, decay:0.2 }), 200);
+    },
+    _thinkTimer: null,
+    startThinkMusic() {
+      if (muted) return;
+      let beat = 0;
+      const pattern = [440,0,392,0,349,0,330,0,349,0,392,0,440,440,0,0];
+      this._thinkTimer = setInterval(() => {
+        if (muted) return;
+        const f = pattern[beat % pattern.length];
+        if (f) beep({ freq:f, type:'triangle', duration:0.09, gain:0.18, decay:0.06 });
+        beat++;
+      }, 500);
+    },
+    stopThinkMusic() { clearInterval(this._thinkTimer); this._thinkTimer = null; },
+  };
+})();
+
 /* ══════════════════════════════════════════════════════════
    PASSWORD GATE  —  PBKDF2-SHA-256
    ══════════════════════════════════════════════════════════ */
