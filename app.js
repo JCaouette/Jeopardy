@@ -794,6 +794,17 @@ function confirmDD() {
    ═══════════════════════════════════════════════════════════ */
 function renderScoreboard() {
   dom.scorePlayers.innerHTML = '';
+  const n = players.length;
+
+  // Balanced column count: every row gets the same number of chips
+  let cols;
+  if      (n <= 4) cols = n;
+  else if (n <= 6) cols = 3;
+  else if (n <= 8) cols = 4;
+  else if (n === 9) cols = 3;
+  else             cols = 5;
+  dom.scorePlayers.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
   players.forEach((p, i) => {
     const chip = mk('div', 'score-chip');
     chip.appendChild(mk('div', 'score-name', p.name));
@@ -801,7 +812,6 @@ function renderScoreboard() {
       (p.score < 0 ? '-$' : '$') + Math.abs(p.score).toLocaleString());
     chip.appendChild(valEl);
 
-    // ± manual adjustment row
     const ctrl  = mk('div', 'score-controls');
     const minus = mk('button', 'score-adj', '−');
     const amtIn = document.createElement('input');
@@ -816,6 +826,14 @@ function renderScoreboard() {
     chip.appendChild(ctrl);
     dom.scorePlayers.appendChild(chip);
   });
+
+  // Invisible spacers so the last row has the same number of cells as every other row
+  const remainder = n % cols;
+  if (remainder !== 0) {
+    for (let j = 0; j < cols - remainder; j++) {
+      dom.scorePlayers.appendChild(mk('div', 'score-chip score-spacer'));
+    }
+  }
 }
 
 function adjustScore(playerIdx, delta) {
