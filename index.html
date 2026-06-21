@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jeopardy!</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ═══════════════════ PASSWORD GATE ═══════════════════ -->
+  <div id="screen-password" class="screen active">
+    <div class="pw-wrap">
+      <h1 class="wordmark">JEOPARDY<span class="gold-em">!</span></h1>
+
+      <!-- Normal login form — shown when app.js is configured -->
+      <div class="pw-box" id="pw-login-form">
+        <div class="pw-subtitle">PRIVATE SITE</div>
+        <input type="password" id="pw-input" placeholder="Enter password…" autocomplete="current-password">
+        <div id="pw-error" class="pw-error hidden">Incorrect password. Try again.</div>
+        <button class="btn btn-large btn-gold" id="btn-pw-submit">ENTER</button>
+        <label class="pw-remember">
+          <input type="checkbox" id="pw-remember"> Remember on this device
+        </label>
+      </div>
+
+      <!-- Setup / hash-generator — shown when unconfigured, or via toggle -->
+      <div class="pw-box pw-setup-box" id="pw-setup-panel" hidden>
+        <div class="pw-subtitle" id="pw-setup-title">HOST SETUP</div>
+        <p class="pw-hint" id="pw-unconfigured-msg" hidden>
+          No password is configured yet. Choose one below to generate
+          the two lines to paste into <strong>app.js</strong>.
+        </p>
+        <div class="pw-field-group">
+          <input type="password" id="pw-gen-pw"      placeholder="Choose a password…"  autocomplete="new-password">
+          <input type="password" id="pw-gen-confirm" placeholder="Confirm password…"   autocomplete="new-password">
+        </div>
+        <div id="pw-gen-error" class="pw-error hidden"></div>
+        <button class="btn btn-large btn-gold" id="btn-pw-generate">GENERATE HASH</button>
+        <div id="pw-gen-result" class="pw-gen-result" hidden>
+          <p class="pw-hint">Paste these two lines into <code>app.js</code>, then push to GitHub:</p>
+          <pre class="pw-gen-code" id="pw-gen-code"></pre>
+          <button class="btn btn-small btn-gold" id="btn-pw-copy">Copy to Clipboard</button>
+        </div>
+      </div>
+
+      <!-- Toggle shown only when configured, so the host can regenerate -->
+      <button class="pw-toggle-link" id="btn-toggle-setup" hidden>
+        ⚙ Host: change password
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ HOME SCREEN ═══════════════════ -->
+  <div id="screen-home" class="screen">
+    <div class="home-wrap">
+      <h1 class="wordmark">JEOPARDY<span class="gold-em">!</span></h1>
+
+      <div id="resume-banner" class="hidden">
+        <button class="btn btn-large btn-gold" id="btn-resume">▶ RESUME GAME</button>
+        <div class="resume-hint">A game is in progress — resume it or start fresh below</div>
+      </div>
+
+      <!-- Question loading -->
+      <div class="home-section load-section">
+        <button class="btn btn-secondary" id="btn-template">⬇ Download Template</button>
+        <label class="btn btn-secondary" id="label-upload">
+          📂 Load Questions
+          <input type="file" id="file-upload" accept=".xlsx">
+        </label>
+        <button class="btn btn-secondary" id="btn-sample">▶ Try Sample Game</button>
+      </div>
+      <div id="load-status" aria-live="polite"></div>
+
+      <!-- Player setup -->
+      <div class="home-section players-section">
+        <h2 class="section-title">PLAYERS</h2>
+        <div id="player-list"></div>
+        <div class="add-player-row">
+          <input type="text" id="new-player-input" placeholder="Enter player name…" maxlength="20" autocomplete="off">
+          <button class="btn btn-gold" id="btn-add-player">+ Add</button>
+        </div>
+      </div>
+
+      <button class="btn btn-large btn-gold" id="btn-start" disabled>START GAME</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ GAME SCREEN ═══════════════════ -->
+  <div id="screen-game" class="screen">
+
+    <!-- Scoreboard strip -->
+    <div id="scoreboard">
+      <div id="round-label">SINGLE JEOPARDY</div>
+      <div id="score-players"></div>
+      <button class="btn btn-small btn-outline" id="btn-next-round">Next Round →</button>
+    </div>
+
+    <!-- Board grid -->
+    <div id="board-wrap">
+      <div id="board" role="grid" aria-label="Jeopardy board"></div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════ CLUE OVERLAY ═══════════════════ -->
+  <div id="overlay-clue" class="overlay" role="dialog" aria-modal="true" aria-label="Clue" hidden>
+    <button class="btn btn-outline btn-small overlay-close" id="btn-close-clue" aria-label="Close clue">✕</button>
+    <div class="clue-box">
+      <div id="clue-meta"></div>
+      <div id="clue-text"></div>
+
+      <div id="clue-actions">
+        <button class="btn btn-gold btn-large" id="btn-reveal-answer">Reveal Answer</button>
+      </div>
+
+      <div id="answer-section" hidden>
+        <div id="answer-text"></div>
+        <div id="player-buttons"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ DAILY DOUBLE OVERLAY ═══════════════════ -->
+  <div id="overlay-dd" class="overlay" role="dialog" aria-modal="true" aria-label="Daily Double" hidden>
+    <div class="dd-box">
+      <div class="dd-title">DAILY<br><span class="gold-em">DOUBLE!</span></div>
+      <div id="dd-form" hidden>
+        <div class="form-group">
+          <label for="dd-player-select">Who found it?</label>
+          <select id="dd-player-select"></select>
+        </div>
+        <div class="form-group">
+          <label for="dd-wager-input">Wager ($)</label>
+          <input type="number" id="dd-wager-input" min="5" step="1" placeholder="Enter wager">
+          <div class="hint" id="dd-wager-hint"></div>
+        </div>
+        <button class="btn btn-gold btn-large" id="btn-dd-confirm">See Clue →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ FINAL JEOPARDY SCREEN ═══════════════════ -->
+  <div id="screen-final" class="screen">
+    <div class="final-wrap">
+      <div class="final-header">FINAL JEOPARDY</div>
+      <div id="final-content"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ WINNER SCREEN ═══════════════════ -->
+  <div id="screen-winner" class="screen">
+    <canvas id="confetti-canvas"></canvas>
+    <div class="winner-wrap">
+      <h1 class="wordmark">JEOPARDY<span class="gold-em">!</span></h1>
+      <h2 class="winner-title">FINAL STANDINGS</h2>
+      <div id="winner-list"></div>
+      <button class="btn btn-large btn-gold" id="btn-new-game">NEW GAME</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
