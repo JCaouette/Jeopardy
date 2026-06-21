@@ -979,13 +979,34 @@ function startConfetti() {
     spin:  (Math.random() - 0.5) * 0.14,
   }));
 
-  let frame = 0;
-  function tick() {
-    if (frame++ > 450) { ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+  canvas.style.opacity = '1';
+  const T_SPAWN_STOP = 4000;  // ms: stop recycling pieces so they fall off naturally
+  const T_FADE_START = 5000;  // ms: begin fading canvas opacity
+  const T_DONE       = 7000;  // ms: fully gone
+
+  const startTime = performance.now();
+
+  function tick(now) {
+    const elapsed = now - startTime;
+
+    if (elapsed >= T_DONE) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.style.opacity = '1';
+      return;
+    }
+
+    if (elapsed >= T_FADE_START) {
+      const t = (elapsed - T_FADE_START) / (T_DONE - T_FADE_START);
+      canvas.style.opacity = String(1 - t);
+    }
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (const p of pieces) {
       p.x += p.vx; p.y += p.vy; p.angle += p.spin;
-      if (p.y > canvas.height) { p.y = -10; p.x = Math.random() * canvas.width; }
+      if (p.y > canvas.height) {
+        if (elapsed < T_SPAWN_STOP) { p.y = -10; p.x = Math.random() * canvas.width; }
+        else continue;
+      }
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(p.angle);
@@ -995,7 +1016,7 @@ function startConfetti() {
     }
     requestAnimationFrame(tick);
   }
-  tick();
+  requestAnimationFrame(tick);
 }
 
 /* ═══════════════════════════════════════════════════════════
