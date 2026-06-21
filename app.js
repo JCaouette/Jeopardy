@@ -3,8 +3,8 @@
 /* ══════════════════════════════════════════════════════════
    PASSWORD GATE  —  PBKDF2-SHA-256
    ══════════════════════════════════════════════════════════ */
-const SITE_PASS_SALT = 'gcjnCkgvHiGPnBFUi6cf7g==';
-const SITE_PASS_HASH = '0uv8hI1/CdSj4ZCO7OTGQksXenisjmOx2Uk2A3U0P3I=';
+const SITE_PASS_SALT = '355zROXGnY99UPsamidkzg==';
+const SITE_PASS_HASH = 'C5VCUSQ7yldRNZFGYPONeWMu0j191RKpXVtmnvXLrHI=';
 const PBKDF2_ITERS   = 200_000;
 const AUTH_KEY       = 'jeopardy_auth';
 

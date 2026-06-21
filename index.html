@@ -13,15 +13,14 @@
   <!-- ═══════════════════ PASSWORD GATE ═══════════════════ -->
   <div id="screen-password" class="screen active">
     <div class="pw-wrap">
-      <h1 class="wordmark">JEOPARDY<span class="gold-em">!</span></h1>
-      <div class="pw-box" id="pw-login-form">
-        <input type="password" id="pw-input" placeholder="Enter password…" autocomplete="current-password">
-        <div id="pw-error" class="pw-error hidden">Incorrect password. Try again.</div>
-        <button class="btn btn-large btn-gold" id="btn-pw-submit">ENTER</button>
-        <label class="pw-remember">
-          <input type="checkbox" id="pw-remember"> Remember on this device
-        </label>
-      </div>
+      <input type="password" id="pw-input" placeholder="Password" autocomplete="current-password">
+      <div id="pw-error" class="pw-error hidden">Incorrect password. Try again.</div>
+      <button class="btn btn-large btn-gold" id="btn-pw-submit">ENTER</button>
+      <label class="pw-toggle">
+        <input type="checkbox" id="pw-remember">
+        <span class="pw-toggle-track"></span>
+        <span class="pw-toggle-label">Remember on this device</span>
+      </label>
     </div>
   </div>
 
