@@ -14,10 +14,7 @@
   <div id="screen-password" class="screen active">
     <div class="pw-wrap">
       <h1 class="wordmark">JEOPARDY<span class="gold-em">!</span></h1>
-
-      <!-- Normal login form — shown when app.js is configured -->
       <div class="pw-box" id="pw-login-form">
-        <div class="pw-subtitle">PRIVATE SITE</div>
         <input type="password" id="pw-input" placeholder="Enter password…" autocomplete="current-password">
         <div id="pw-error" class="pw-error hidden">Incorrect password. Try again.</div>
         <button class="btn btn-large btn-gold" id="btn-pw-submit">ENTER</button>
@@ -25,31 +22,6 @@
           <input type="checkbox" id="pw-remember"> Remember on this device
         </label>
       </div>
-
-      <!-- Setup / hash-generator — shown when unconfigured, or via toggle -->
-      <div class="pw-box pw-setup-box" id="pw-setup-panel" hidden>
-        <div class="pw-subtitle" id="pw-setup-title">HOST SETUP</div>
-        <p class="pw-hint" id="pw-unconfigured-msg" hidden>
-          No password is configured yet. Choose one below to generate
-          the two lines to paste into <strong>app.js</strong>.
-        </p>
-        <div class="pw-field-group">
-          <input type="password" id="pw-gen-pw"      placeholder="Choose a password…"  autocomplete="new-password">
-          <input type="password" id="pw-gen-confirm" placeholder="Confirm password…"   autocomplete="new-password">
-        </div>
-        <div id="pw-gen-error" class="pw-error hidden"></div>
-        <button class="btn btn-large btn-gold" id="btn-pw-generate">GENERATE HASH</button>
-        <div id="pw-gen-result" class="pw-gen-result" hidden>
-          <p class="pw-hint">Paste these two lines into <code>app.js</code>, then push to GitHub:</p>
-          <pre class="pw-gen-code" id="pw-gen-code"></pre>
-          <button class="btn btn-small btn-gold" id="btn-pw-copy">Copy to Clipboard</button>
-        </div>
-      </div>
-
-      <!-- Toggle shown only when configured, so the host can regenerate -->
-      <button class="pw-toggle-link" id="btn-toggle-setup" hidden>
-        ⚙ Host: change password
-      </button>
     </div>
   </div>
 

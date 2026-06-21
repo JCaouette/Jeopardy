@@ -1,24 +1,13 @@
 'use strict';
 
-/* ═══════════════════════════════════════════════════════════
-   PASSWORD GATE  —  PBKDF2-SHA-256  (Web Crypto API)
-
-   How to set your password:
-     1. Deploy the site with SITE_PASS_SALT and SITE_PASS_HASH
-        both empty (the default below).
-     2. Visit the site — you'll see a "Host Setup" generator.
-     3. Enter your desired password and click GENERATE HASH.
-     4. Paste the two output lines into this file and push.
-
-   To change the password later, click "⚙ Host: change password"
-   below the login form on the live site, or repeat steps 1–4.
-   ═══════════════════════════════════════════════════════════ */
-const SITE_PASS_SALT = '';   // 16-byte random salt  (base64) — set via in-page generator
-const SITE_PASS_HASH = '';   // PBKDF2 derived key   (base64) — set via in-page generator
+/* ══════════════════════════════════════════════════════════
+   PASSWORD GATE  —  PBKDF2-SHA-256
+   ══════════════════════════════════════════════════════════ */
+const SITE_PASS_SALT = 'gcjnCkgvHiGPnBFUi6cf7g==';
+const SITE_PASS_HASH = '0uv8hI1/CdSj4ZCO7OTGQksXenisjmOx2Uk2A3U0P3I=';
 const PBKDF2_ITERS   = 200_000;
 const AUTH_KEY       = 'jeopardy_auth';
 
-// Derive a PBKDF2-SHA-256 key from a plaintext password and a base64 salt.
 async function deriveKey(password, saltB64) {
   const enc    = new TextEncoder();
   const salt   = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
@@ -31,23 +20,10 @@ async function deriveKey(password, saltB64) {
 }
 
 async function checkAuth() {
-  if (!SITE_PASS_SALT || !SITE_PASS_HASH) {
-    // Not configured yet — show setup wizard, hide login form
-    document.getElementById('pw-login-form').hidden   = true;
-    document.getElementById('pw-setup-panel').hidden  = false;
-    document.getElementById('pw-unconfigured-msg').hidden = false;
-    document.getElementById('btn-toggle-setup').hidden = true;
-    showScreen('password');
-    return;
-  }
   const remembered = localStorage.getItem(AUTH_KEY)   === SITE_PASS_HASH;
   const session    = sessionStorage.getItem(AUTH_KEY) === '1';
   if (remembered || session) showScreen('home');
-  else {
-    // Show login; reveal the "change password" toggle for the host
-    document.getElementById('btn-toggle-setup').hidden = false;
-    showScreen('password');
-  }
+  else showScreen('password');
 }
 
 async function handlePasswordSubmit() {
@@ -75,56 +51,6 @@ async function handlePasswordSubmit() {
     btn.disabled    = false;
     btn.textContent = 'ENTER';
   }
-}
-
-async function handleGenerateHash() {
-  const pw1    = document.getElementById('pw-gen-pw').value;
-  const pw2    = document.getElementById('pw-gen-confirm').value;
-  const errEl  = document.getElementById('pw-gen-error');
-  const resEl  = document.getElementById('pw-gen-result');
-  const btn    = document.getElementById('btn-pw-generate');
-
-  errEl.classList.add('hidden');
-  resEl.hidden = true;
-
-  if (!pw1)        { errEl.textContent = 'Please enter a password.';    errEl.classList.remove('hidden'); return; }
-  if (pw1 !== pw2) { errEl.textContent = 'Passwords do not match.';      errEl.classList.remove('hidden'); return; }
-  if (pw1.length < 6) { errEl.textContent = 'Use at least 6 characters.'; errEl.classList.remove('hidden'); return; }
-
-  btn.disabled    = true;
-  btn.textContent = 'GENERATING…';
-  try {
-    const saltBytes = crypto.getRandomValues(new Uint8Array(16));
-    const saltB64   = btoa(String.fromCharCode(...saltBytes));
-    const hashB64   = await deriveKey(pw1, saltB64);
-
-    document.getElementById('pw-gen-code').textContent =
-      `const SITE_PASS_SALT = '${saltB64}';\nconst SITE_PASS_HASH = '${hashB64}';`;
-    resEl.hidden = false;
-  } finally {
-    btn.disabled    = false;
-    btn.textContent = 'GENERATE HASH';
-  }
-}
-
-async function copyGenResult() {
-  const text = document.getElementById('pw-gen-code').textContent;
-  try {
-    await navigator.clipboard.writeText(text);
-    const btn = document.getElementById('btn-pw-copy');
-    btn.textContent = '✓ Copied!';
-    setTimeout(() => (btn.textContent = 'Copy to Clipboard'), 2000);
-  } catch (_) { /* clipboard not available — user can select manually */ }
-}
-
-function toggleSetupPanel() {
-  const login  = document.getElementById('pw-login-form');
-  const setup  = document.getElementById('pw-setup-panel');
-  const toggle = document.getElementById('btn-toggle-setup');
-  const showing = !setup.hidden;
-  login.hidden  = !showing;
-  setup.hidden  = showing;
-  toggle.textContent = showing ? '⚙ Host: change password' : '← Back to login';
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -342,13 +268,9 @@ function cacheDOM() {
 }
 
 function attachListeners() {
-  // Password gate — login
+  // Password gate
   document.getElementById('btn-pw-submit').addEventListener('click', handlePasswordSubmit);
   document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') handlePasswordSubmit(); });
-  // Password gate — setup / generator
-  document.getElementById('btn-pw-generate').addEventListener('click', handleGenerateHash);
-  document.getElementById('btn-pw-copy').addEventListener('click', copyGenResult);
-  document.getElementById('btn-toggle-setup').addEventListener('click', toggleSetupPanel);
   // Home / game
   dom.fileUpload.addEventListener('change', handleFileUpload);
   dom.btnTemplate.addEventListener('click', downloadTemplate);

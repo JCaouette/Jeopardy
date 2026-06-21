@@ -757,58 +757,6 @@ select option { background: #111; color: var(--white); }
   cursor: pointer;
 }
 
-/* Setup / generator panel */
-.pw-setup-box { gap: 0.9rem; }
-
-.pw-field-group { display: flex; flex-direction: column; gap: 0.55rem; }
-
-.pw-hint {
-  font-size: 0.8rem;
-  color: rgba(255,255,255,0.5);
-  text-transform: none;
-  letter-spacing: normal;
-  line-height: 1.5;
-  text-align: center;
-}
-.pw-hint strong { color: var(--cream); }
-.pw-hint code   { color: var(--gold); background: rgba(0,0,0,0.3); padding: 0.1em 0.3em; border-radius: 2px; }
-
-.pw-gen-result {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  animation: fade-scale-in 0.2s ease;
-}
-
-.pw-gen-code {
-  background: rgba(0,0,0,0.5);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: var(--radius);
-  padding: 0.8rem 1rem;
-  font-size: 0.72rem;
-  font-family: 'Courier New', monospace;
-  color: var(--gold);
-  word-break: break-all;
-  white-space: pre-wrap;
-  text-transform: none;
-  letter-spacing: normal;
-  line-height: 1.6;
-}
-
-.pw-toggle-link {
-  background: none;
-  border: none;
-  color: rgba(255,255,255,0.25);
-  font-family: inherit;
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  cursor: pointer;
-  padding: 0.2rem;
-  transition: color 0.2s;
-}
-.pw-toggle-link:hover { color: rgba(255,255,255,0.5); }
 
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
