@@ -1,14 +1,19 @@
 'use strict';
 
 const Audio = (() => {
-  let ctx = null;
-  let muted = JSON.parse(localStorage.getItem('jp_muted') ?? 'false');
+  let ctx    = null;
+  let muted  = JSON.parse(localStorage.getItem('jp_muted') ?? 'false');
+  let _thinkTimer = null;
+  let _thinkBeat  = 0;
+
   function getCtx() {
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
   }
-  function beep({ freq=440, type='sine', duration=0.18, gain=0.3, decay=0.12 }={}) {
+
+  // Simple one-shot beep (used for click sounds and think-music notes)
+  function beep({ freq = 440, type = 'sine', duration = 0.18, gain = 0.3, decay = 0.12 } = {}) {
     if (muted) return;
     const c = getCtx();
     const osc = c.createOscillator();
@@ -20,36 +25,118 @@ const Audio = (() => {
     osc.connect(vol); vol.connect(c.destination);
     osc.start(c.currentTime); osc.stop(c.currentTime + duration + decay + 0.05);
   }
-  function chord(notes, opts={}) { notes.forEach(f => beep({...opts, freq:f})); }
+
+  // Precisely-timed note scheduled relative to ctx.currentTime
+  function schedNote(freq, startOffset, dur, gainVal, type = 'triangle') {
+    if (!freq || muted) return;
+    const c = getCtx();
+    const t = c.currentTime + startOffset;
+    const osc = c.createOscillator();
+    const vol = c.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    vol.gain.setValueAtTime(0, t);
+    vol.gain.linearRampToValueAtTime(gainVal, t + 0.015);
+    vol.gain.setValueAtTime(gainVal, t + dur - 0.04);
+    vol.gain.linearRampToValueAtTime(0, t + dur);
+    osc.connect(vol); vol.connect(c.destination);
+    osc.start(t); osc.stop(t + dur + 0.05);
+  }
+
+  // Jeopardy! "Think!" theme in Bb major — 0 = rest, ~70 BPM
+  const THINK_BPM   = 70;
+  const THINK_BEAT  = 60000 / THINK_BPM;
+  const THINK_NOTES = [
+    // mm. 1-2  Bb Bb(lo) Bb Db | Bb Ab G  Eb
+    466, 233, 466, 554,   466, 415, 392, 311,
+    // mm. 3-4  Ab Ab(lo) Ab Bb | Ab G  F  Eb
+    415, 208, 415, 466,   415, 392, 349, 311,
+    // mm. 5-6  Bb Bb(lo) Bb Db | Bb F(hi) Eb(hi) Db(hi)
+    466, 233, 466, 554,   466, 698, 622, 554,
+    // mm. 7-8  Bb Ab G  F  | Eb  rest Eb  rest
+    466, 415, 392, 349,   311, 0,  311, 0,
+    // repeat
+    466, 233, 466, 554,   466, 415, 392, 311,
+    415, 208, 415, 466,   415, 392, 349, 311,
+    466, 233, 466, 554,   466, 698, 622, 554,
+    466, 415, 392, 349,   311, 0,  0,   0,
+  ];
+
   return {
     isMuted: () => muted,
-    toggleMute() { muted = !muted; localStorage.setItem('jp_muted', JSON.stringify(muted)); return muted; },
-    cellSelect()  { beep({ freq:660, type:'triangle', duration:0.08, gain:0.25 }); },
-    clueReveal()  { beep({ freq:880, type:'sine', duration:0.14, gain:0.2, decay:0.18 }); },
+    toggleMute() {
+      muted = !muted;
+      localStorage.setItem('jp_muted', JSON.stringify(muted));
+      return muted;
+    },
+
+    cellSelect() {
+      beep({ freq: 660, type: 'triangle', duration: 0.08, gain: 0.2 });
+    },
+
+    clueReveal() {
+      if (muted) return;
+      beep({ freq: 660, type: 'sine', duration: 0.1, gain: 0.18, decay: 0.05 });
+      setTimeout(() => beep({ freq: 880, type: 'sine', duration: 0.12, gain: 0.18, decay: 0.08 }), 80);
+    },
+
     dailyDouble() {
       if (muted) return;
-      setTimeout(() => beep({ freq:220, type:'sawtooth', duration:0.12, gain:0.45, decay:0.08 }), 0);
-      setTimeout(() => beep({ freq:440, type:'sawtooth', duration:0.22, gain:0.4,  decay:0.15 }), 130);
-      setTimeout(() => beep({ freq:880, type:'sawtooth', duration:0.3,  gain:0.35, decay:0.2  }), 310);
+      // Ascending dramatic fanfare
+      [196, 247, 294, 370, 440, 554, 659].forEach((f, i) => {
+        schedNote(f, 0.05 + i * 0.08, 0.14, 0.3, 'sawtooth');
+      });
+      schedNote(880, 0.67, 0.55, 0.35, 'sawtooth');
     },
-    correct() { chord([523,659,784], { type:'triangle', duration:0.22, gain:0.22, decay:0.28 }); },
-    wrong() {
-      beep({ freq:180, type:'sawtooth', duration:0.28, gain:0.4, decay:0.18 });
-      setTimeout(() => beep({ freq:140, type:'sawtooth', duration:0.35, gain:0.35, decay:0.2 }), 200);
-    },
-    _thinkTimer: null,
-    startThinkMusic() {
+
+    correct() {
       if (muted) return;
-      let beat = 0;
-      const pattern = [440,0,392,0,349,0,330,0,349,0,392,0,440,440,0,0];
-      this._thinkTimer = setInterval(() => {
-        if (muted) return;
-        const f = pattern[beat % pattern.length];
-        if (f) beep({ freq:f, type:'triangle', duration:0.09, gain:0.18, decay:0.06 });
-        beat++;
-      }, 500);
+      schedNote(523,  0.0,  0.14, 0.22);
+      schedNote(659,  0.12, 0.14, 0.22);
+      schedNote(784,  0.24, 0.28, 0.22);
+      schedNote(1047, 0.24, 0.28, 0.12);
     },
-    stopThinkMusic() { clearInterval(this._thinkTimer); this._thinkTimer = null; },
+
+    wrong() {
+      if (muted) return;
+      schedNote(240, 0.0,  0.28, 0.4,  'sawtooth');
+      schedNote(190, 0.18, 0.28, 0.35, 'sawtooth');
+      schedNote(150, 0.34, 0.22, 0.3,  'sawtooth');
+    },
+
+    roundFanfare() {
+      if (muted) return;
+      // "Double Jeopardy!" ascending fanfare
+      [262, 330, 392, 494, 587, 740].forEach((f, i) => {
+        schedNote(f, 0.05 + i * 0.11, 0.18, 0.22);
+      });
+      [466, 587, 698].forEach(f => schedNote(f, 0.82, 0.55, 0.18));
+    },
+
+    winnerFanfare() {
+      if (muted) return;
+      [523, 659, 784, 1047, 784, 1047].forEach((f, i) => {
+        schedNote(f, 0.05 + i * 0.14, 0.2, 0.22);
+      });
+      [523, 659, 784, 1047].forEach(f => schedNote(f, 0.97, 0.8, 0.18));
+    },
+
+    startThinkMusic() {
+      if (muted || _thinkTimer) return;
+      _thinkBeat = 0;
+      _thinkTimer = setInterval(() => {
+        if (muted) { clearInterval(_thinkTimer); _thinkTimer = null; return; }
+        const freq = THINK_NOTES[_thinkBeat % THINK_NOTES.length];
+        if (freq) beep({ freq, type: 'triangle', duration: 0.55, gain: 0.18, decay: 0.15 });
+        _thinkBeat++;
+      }, THINK_BEAT);
+    },
+
+    stopThinkMusic() {
+      clearInterval(_thinkTimer);
+      _thinkTimer = null;
+      _thinkBeat  = 0;
+    },
   };
 })();
 
@@ -347,6 +434,15 @@ function attachListeners() {
   dom.ddPlayerSelect.addEventListener('change', updateDDHint);
   dom.ddWagerInput.addEventListener('input', updateDDHint);
   dom.btnNewGame.addEventListener('click', resetToHome);
+  // Mute toggle
+  const muteBtn = document.getElementById('mute-toggle');
+  const syncMuteIcon = (muted) => {
+    document.getElementById('mute-icon-on').style.display  = muted ? 'none' : '';
+    document.getElementById('mute-icon-off').style.display = muted ? '' : 'none';
+    muteBtn.classList.toggle('muted', muted);
+  };
+  syncMuteIcon(Audio.isMuted());
+  muteBtn.addEventListener('click', () => syncMuteIcon(Audio.toggleMute()));
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if (!dom.overlayDD.hidden) cancelDD();
@@ -680,6 +776,7 @@ function resumeGame() {
 function goToRound(round) {
   currentRound = round;
   dom.roundLabel.textContent = round === 'single' ? 'SINGLE JEOPARDY' : 'DOUBLE JEOPARDY';
+  if (round === 'double') Audio.roundFanfare();
   renderScoreboard();
   renderBoard();
   showScreen('game');
@@ -746,6 +843,7 @@ function openClue(col, row) {
   clueMarks    = {};
   scoreSnapshot = players.map(p => p.score);
 
+  Audio.cellSelect();
   if (cell.dd) openDailyDouble();
   else         showClueOverlay();
 }
@@ -767,6 +865,7 @@ function showClueOverlay() {
   dom.overlayDD.hidden   = true;
   dom.overlayClue.hidden = false;
   dom.btnReveal.focus();
+  Audio.clueReveal();
 }
 
 function revealAnswer() {
@@ -815,6 +914,8 @@ function makeMarkBtn(label, cls, onClick) {
 
 function toggleMark(playerIdx, mark) {
   clueMarks[playerIdx] = clueMarks[playerIdx] === mark ? null : mark;
+  if      (clueMarks[playerIdx] === 'correct') Audio.correct();
+  else if (clueMarks[playerIdx] === 'wrong')   Audio.wrong();
   applyMarksFromSnapshot();
   renderScoreboard();
   refreshMarkButtonStates();
@@ -840,6 +941,7 @@ function refreshMarkButtonStates() {
 }
 
 function cancelClue() {
+  Audio.stopThinkMusic();
   activeClue    = null;
   clueMarks     = {};
   scoreSnapshot = [];
@@ -847,6 +949,7 @@ function cancelClue() {
 }
 
 function closeClue() {
+  Audio.stopThinkMusic();
   if (activeClue) {
     usedCells[currentRound][`${activeClue.col}-${activeClue.row}`] = true;
     activeClue = null;
@@ -868,6 +971,7 @@ function cancelDD() {
 }
 
 function openDailyDouble() {
+  Audio.dailyDouble();
   // Populate player select
   dom.ddPlayerSelect.innerHTML = '';
   players.forEach((p, i) => {
@@ -1019,6 +1123,7 @@ function renderFinalPhase() {
       btn('Show Clue →', 'btn btn-gold btn-large', () => {
         players.forEach((_, i) => { if (finalWagers[i] == null) finalWagers[i] = 0; });
         finalPhase = 'clue'; renderFinalPhase();
+        Audio.startThinkMusic();
       }),
     );
 
@@ -1026,7 +1131,7 @@ function renderFinalPhase() {
     div.append(
       mk('div', 'final-clue-text', f.clue),
       mk('div', 'final-hint', 'Players — write down your answers now!'),
-      btn('Reveal Answer →', 'btn btn-gold btn-large', () => { finalPhase = 'answer'; renderFinalPhase(); }),
+      btn('Reveal Answer →', 'btn btn-gold btn-large', () => { Audio.stopThinkMusic(); finalPhase = 'answer'; renderFinalPhase(); }),
     );
 
   } else if (finalPhase === 'answer') {
@@ -1071,8 +1176,8 @@ function toggleFinalMark(playerIdx, isCorrect) {
     finalCorrect[playerIdx] = null;
   } else {
     finalCorrect[playerIdx] = isCorrect;
-    if (isCorrect) players[playerIdx].score += wager;
-    else           players[playerIdx].score -= wager;
+    if (isCorrect) { players[playerIdx].score += wager; Audio.correct(); }
+    else           { players[playerIdx].score -= wager; Audio.wrong(); }
   }
   saveState();
 }
@@ -1082,6 +1187,7 @@ function toggleFinalMark(playerIdx, isCorrect) {
    ═══════════════════════════════════════════════════════════ */
 function showWinner() {
   currentRound = 'done';
+  Audio.winnerFanfare();
   saveState();
 
   const sorted = [...players].sort((a, b) => b.score - a.score);
