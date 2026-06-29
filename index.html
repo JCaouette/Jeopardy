@@ -6,7 +6,7 @@
   <title>Handley-Thompson Jeopardy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@600;700&family=Barlow:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 
@@ -146,6 +146,13 @@
       document.getElementById('btn-go-home').addEventListener('click', function () {
         showScreen('home');
         dom.resumeBanner.classList.remove('hidden');
+      });
+      // Hide mute button (sound removed)
+      document.getElementById('mute-toggle').style.display = 'none';
+      // Silence all sound — replace every Audio method with a no-op
+      ['cellSelect','clueReveal','dailyDouble','correct','wrong',
+       'roundFanfare','winnerFanfare','startThinkMusic','stopThinkMusic'].forEach(function (m) {
+        Audio[m] = function () {};
       });
     });
   </script>

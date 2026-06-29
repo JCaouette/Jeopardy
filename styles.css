@@ -474,9 +474,9 @@ select option { background: var(--navy-2); color: var(--white); }
   text-shadow: 0 0 18px rgba(245,197,50,0.38), 0 2px 4px rgba(0,0,0,0.7);
 }
 .board-cell.clue-cell:hover {
-  background: linear-gradient(155deg, #2644BC 0%, #1A38A8 50%, #12288A 100%);
-  box-shadow: var(--tile-glow), 0 6px 22px rgba(0,0,0,0.55);
-  transform: scale(1.04) translateY(-1px);
+  background: linear-gradient(155deg, #1E3880 0%, #162C72 50%, #102060 100%);
+  box-shadow: 0 0 0 1px rgba(245,197,50,0.18), 0 4px 16px rgba(0,0,0,0.5);
+  transform: scale(1.02);
   z-index: 2;
 }
 .board-cell.clue-cell:active  { transform: scale(0.97); box-shadow: var(--tile-shadow); }
@@ -972,6 +972,7 @@ select option { background: var(--navy-2); color: var(--white); }
 
 /* ── Mute toggle ── */
 #mute-toggle {
+  display: none;
   position: fixed;
   bottom: 18px;
   right: 18px;
