@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jeopardy!</title>
+  <title>Handley-Thompson Jeopardy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@600;700&family=Barlow:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
@@ -27,7 +27,7 @@
   <!-- ═══════════════════ HOME SCREEN ═══════════════════ -->
   <div id="screen-home" class="screen">
     <div class="home-wrap">
-      <h1 class="wordmark">JEOPARDY<span class="gold-em">!</span></h1>
+      <h1 class="wordmark">HANDLEY-THOMPSON<br>JEOPARDY</h1>
 
       <div id="resume-banner" class="hidden">
         <button class="btn btn-large btn-gold" id="btn-resume"><span aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle"><polygon points="5 3 19 12 5 21 5 3"/></svg></span> RESUME GAME</button>
@@ -66,7 +66,10 @@
     <div id="scoreboard">
       <div id="round-label">SINGLE JEOPARDY</div>
       <div id="score-players"></div>
-      <button class="btn btn-small btn-outline" id="btn-next-round">Next Round →</button>
+      <div class="scoreboard-actions">
+        <button class="btn btn-small btn-outline" id="btn-go-home">← Home</button>
+        <button class="btn btn-small btn-outline" id="btn-next-round">Next Round →</button>
+      </div>
     </div>
 
     <!-- Board grid -->
@@ -128,7 +131,7 @@
   <div id="screen-winner" class="screen">
     <canvas id="confetti-canvas"></canvas>
     <div class="winner-wrap">
-      <h1 class="wordmark">JEOPARDY<span class="gold-em">!</span></h1>
+      <h1 class="wordmark">HANDLEY-THOMPSON<br>JEOPARDY</h1>
       <h2 class="winner-title">FINAL STANDINGS</h2>
       <div id="winner-list"></div>
       <button class="btn btn-large btn-gold" id="btn-new-game">NEW GAME</button>
@@ -138,5 +141,13 @@
   <button id="mute-toggle" aria-label="Toggle sound" title="Toggle sound"><svg id="mute-icon-on" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg><svg id="mute-icon-off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg></button>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="app.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      document.getElementById('btn-go-home').addEventListener('click', function () {
+        showScreen('home');
+        dom.resumeBanner.classList.remove('hidden');
+      });
+    });
+  </script>
 </body>
 </html>
