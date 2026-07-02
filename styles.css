@@ -835,7 +835,7 @@ button.board-cell {
   opacity: 0.6;
 }
 
-/* ── Think timer — drains over 30s (duration mirrored in app.js) ── */
+/* ── Think timer — drains over 2.5min (duration mirrored in app.js) ── */
 .think-timer {
   width: min(560px, 90%);
   height: 6px;
@@ -847,7 +847,7 @@ button.board-cell {
   height: 100%;
   background: linear-gradient(90deg, var(--gold-warm), var(--gold-bright));
   transform-origin: left;
-  animation: think-drain 30s linear forwards;
+  animation: think-drain 150s linear forwards;
 }
 @keyframes think-drain {
   from { transform: scaleX(1); }

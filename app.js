@@ -214,7 +214,7 @@ let lastFocusedCell = null;  // tile that opened the current overlay
 let ddRevealTimer   = null;  // pending "show wager form" timeout
 let scoreAnimSeq    = 0;     // invalidates in-flight score count-ups
 let splashActive    = false; // round splash showing — block re-entry
-let finalThinkTimer = null;  // Final Jeopardy 30s "time's up" timeout
+let finalThinkTimer = null;  // Final Jeopardy 2.5min "time's up" timeout
 
 /* ═══════════════════════════════════════════════════════════
    DOM CACHE
@@ -1182,11 +1182,11 @@ function renderFinalPhase() {
       hint,
       btn('Reveal Answer →', 'btn btn-gold btn-large', () => { finalPhase = 'answer'; renderFinalPhase(); }),
     );
-    // Matches the 30s CSS think-drain animation on .think-timer-fill
+    // Matches the 2.5min CSS think-drain animation on .think-timer-fill
     finalThinkTimer = setTimeout(() => {
       timer.classList.add('done');
       hint.textContent = 'Time’s up — pens down!';
-    }, 30_000);
+    }, 150_000);
 
   } else if (finalPhase === 'answer') {
     div.append(
