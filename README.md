@@ -65,7 +65,7 @@ Save the file as `.xlsx`. On the game's home screen, click **Load Questions** an
 2. **Single Jeopardy** — a player nominates a category and dollar value. Click the cell; the host reads the clue aloud. Click **Reveal Answer**, then mark each player **✓** (correct) or **✗** (wrong). Marks are toggleable — click again to undo. Scores update live. Click **Close** to return to the board.
 3. **Daily Double** — the overlay flashes, then asks which player found it and how much they wager. Wager constraints: minimum $5, maximum = the greater of that player's score or the round's top value.
 4. **Double Jeopardy** — click **Next Round →** in the scoreboard to advance. Same rules, doubled values.
-5. **Final Jeopardy** — advance again. The flow walks through: category reveal → wager collection → clue reveal → answer reveal → marking → final standings.
+5. **Final Jeopardy** — advance again. The flow walks through: category reveal → wager collection → clue reveal → answer reveal → marking → final standings. While the clue is up, a 30-second gold timer bar drains beneath it — when it empties, the screen calls "pens down."
 6. **Scoreboard adjustments** — the host can manually fix any player's score at any time using the **−  200  +** controls in the scoreboard strip.
 
 ---

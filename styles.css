@@ -35,7 +35,7 @@
   /* Text */
   --white:     #FFFFFF;
   --cream:     #EAD9A0;
-  --text-mute: rgba(255, 255, 255, 0.28);
+  --text-mute: rgba(255, 255, 255, 0.55);
 
   /* Spacing & shape */
   --gap:       5px;
@@ -86,7 +86,7 @@ html, body {
   letter-spacing: 0.06em;
   line-height: 1.05;
   text-align: center;
-  text-shadow: 3px 3px 0 rgba(0,0,0,0.7), 0 0 50px rgba(245,197,50,0.25);
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.6), 0 0 34px rgba(245,197,50,0.16);
   user-select: none;
 }
 .gold-em { color: var(--gold); }
@@ -316,6 +316,17 @@ select option { background: var(--navy-2); color: var(--white); }
   justify-content: center;
 }
 
+/* Pulses once every tile on the board has been played */
+@keyframes nudge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 197, 50, 0); }
+  50%      { box-shadow: 0 0 0 5px rgba(245, 197, 50, 0.22); }
+}
+#btn-next-round.nudge {
+  border-color: var(--gold);
+  color: var(--gold);
+  animation: nudge-pulse 1.8s ease-in-out infinite;
+}
+
 #round-label {
   font-size: 0.8rem;
   letter-spacing: 0.24em;
@@ -359,16 +370,24 @@ select option { background: var(--navy-2); color: var(--white); }
 .score-chip:has(.score-value.negative) { border-top: 2px solid rgba(232, 81, 71, 0.45); }
 
 .score-name {
-  font-size: 0.52rem;
-  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  letter-spacing: 0.13em;
   color: var(--cream);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
   text-align: center;
-  opacity: 0.55;
+  opacity: 0.85;
 }
+
+/* Current leader(s) — gold podium edge */
+.score-chip.leader {
+  border-color: rgba(245, 197, 50, 0.4);
+  border-top-color: var(--gold-bright);
+  box-shadow: 0 0 16px rgba(245, 197, 50, 0.14);
+}
+.score-chip.leader .score-name { color: var(--gold); opacity: 1; }
 .score-value {
   font-family: 'Bebas Neue', Impact, sans-serif;
   font-size: 1.4rem;
@@ -379,6 +398,16 @@ select option { background: var(--navy-2); color: var(--white); }
   text-shadow: 0 0 12px rgba(245,197,50,0.28);
 }
 .score-value.negative { color: var(--red); text-shadow: 0 0 10px rgba(232,81,71,0.28); }
+
+/* Score change feedback — JS counts the value up/down while these flash */
+@keyframes bump-up {
+  30% { transform: scale(1.22); color: var(--green); text-shadow: 0 0 14px rgba(46, 204, 113, 0.5); }
+}
+@keyframes bump-down {
+  30% { transform: scale(1.14); color: var(--red); text-shadow: 0 0 14px rgba(232, 81, 71, 0.5); }
+}
+.score-value.bump-up   { animation: bump-up 0.5s ease; }
+.score-value.bump-down { animation: bump-down 0.5s ease; }
 
 .score-controls { display: flex; align-items: center; gap: 2px; }
 .score-adj {
@@ -424,6 +453,14 @@ select option { background: var(--navy-2); color: var(--white); }
   width: 100%;
 }
 
+/* Clue tiles are real <button>s — strip UA styles */
+button.board-cell {
+  border: none;
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Base tile */
 .board-cell {
   background: linear-gradient(155deg, var(--navy-5) 0%, var(--navy-4) 50%, #0D1A52 100%);
@@ -453,7 +490,7 @@ select option { background: var(--navy-2); color: var(--white); }
 
 /* Category header */
 .board-cell.category {
-  font-size: clamp(0.55rem, 1.3vw, 0.92rem);
+  font-size: clamp(0.55rem, 1.3vw, 1.4rem);
   color: var(--cream);
   letter-spacing: 0.05em;
   line-height: 1.2;
@@ -468,10 +505,10 @@ select option { background: var(--navy-2); color: var(--white); }
 .board-cell.clue-cell {
   cursor: pointer;
   font-family: 'Bebas Neue', Impact, sans-serif;
-  font-size: clamp(1.1rem, 3.2vw, 2.6rem);
+  font-size: clamp(1.1rem, 3.2vw, 4rem);
   color: var(--gold);
   letter-spacing: 0.02em;
-  text-shadow: 0 0 18px rgba(245,197,50,0.38), 0 2px 4px rgba(0,0,0,0.7);
+  text-shadow: 0 0 12px rgba(245,197,50,0.22), 0 2px 4px rgba(0,0,0,0.6);
 }
 .board-cell.clue-cell:hover {
   background: linear-gradient(155deg, #1E3880 0%, #162C72 50%, #102060 100%);
@@ -496,12 +533,15 @@ select option { background: var(--navy-2); color: var(--white); }
 }
 .board-cell.used::before { display: none; }
 
-/* Entry animation for freshly-rendered tiles */
+/* Cascade-in on round start — staggered per tile via --i (set in JS) */
 @keyframes tile-enter {
-  from { opacity: 0; transform: scale(0.93); }
-  to   { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
 }
-.board-cell.clue-cell { animation: tile-enter 0.22s ease both; }
+.board-cell.cascade {
+  animation: tile-enter 0.32s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 16ms);
+}
 
 /* ══════════════════════════════════════════════════════════
    OVERLAYS — clue & daily double
@@ -514,9 +554,15 @@ select option { background: var(--navy-2); color: var(--white); }
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: overlay-in 0.26s cubic-bezier(0.2, 0.8, 0.3, 1.05);
+  overflow-y: auto;
+  animation: overlay-fade 0.24s ease;
 }
 .overlay[hidden] { display: none !important; }
+
+@keyframes overlay-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
 
 @keyframes overlay-in {
   from { opacity: 0; transform: scale(0.95); }
@@ -542,17 +588,24 @@ select option { background: var(--navy-2); color: var(--white); }
   z-index: 10;
 }
 
-/* ── Clue box ── */
+/* ── Clue box — zooms out from the tile that was clicked (--dx/--dy set in JS) ── */
 .clue-box {
-  width: min(880px, 95vw);
+  width: min(1080px, 92vw);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1.6rem;
+  margin: auto;               /* keeps centering correct when the overlay scrolls */
   padding: 2.5rem 2rem;
   text-align: center;
   position: relative;
   z-index: 1;
+  animation: zoom-from-tile 0.32s cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+@keyframes zoom-from-tile {
+  from { opacity: 0.25; transform: translate(var(--dx, 0px), var(--dy, 0px)) scale(0.1); }
+  to   { opacity: 1; transform: none; }
 }
 
 #clue-meta {
@@ -564,12 +617,13 @@ select option { background: var(--navy-2); color: var(--white); }
 }
 
 #clue-text {
-  font-family: 'Barlow', 'Arial', sans-serif;
-  font-size: clamp(1.6rem, 3.8vw, 3.2rem);
+  font-family: 'Gelasio', Georgia, 'Times New Roman', serif;
+  font-weight: 600;
+  font-size: clamp(1.6rem, 3.8vw, 4.6rem);
   line-height: 1.35;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   color: var(--white);
-  max-width: 820px;
+  max-width: 1000px;
   text-shadow: 0 2px 10px rgba(0,0,0,0.5);
   animation: clue-pop 0.42s cubic-bezier(0.2, 0.8, 0.3, 1.08);
 }
@@ -580,7 +634,7 @@ select option { background: var(--navy-2); color: var(--white); }
 }
 
 #answer-text {
-  font-size: clamp(1.3rem, 2.8vw, 2.3rem);
+  font-size: clamp(1.3rem, 2.8vw, 3rem);
   color: var(--gold);
   border: 1px solid rgba(245, 197, 50, 0.45);
   border-radius: var(--radius-lg);
@@ -640,6 +694,7 @@ select option { background: var(--navy-2); color: var(--white); }
   flex-direction: column;
   align-items: center;
   gap: 2rem;
+  margin: auto;
   padding: 2.5rem 2rem;
   text-align: center;
   width: min(520px, 95vw);
@@ -662,6 +717,22 @@ select option { background: var(--navy-2); color: var(--white); }
 }
 
 @keyframes dd-ray-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ── Round splash interstitial ── */
+#overlay-splash { transition: opacity 0.35s ease; }
+#overlay-splash.splash-out { opacity: 0; }
+
+.splash-title {
+  font-family: 'Bebas Neue', Impact, sans-serif;
+  font-size: clamp(4rem, 13vw, 10rem);
+  color: var(--white);
+  line-height: 0.95;
+  font-style: italic;
+  text-align: center;
+  animation: dd-slam 0.58s cubic-bezier(0.15, 0.9, 0.3, 1.3);
+  text-shadow: 0 0 60px rgba(245,197,50,0.45), 0 4px 0 rgba(0,0,0,0.8);
+  user-select: none;
+}
 
 .dd-starburst { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .dd-starburst svg { width: min(75%, 360px); height: min(75%, 360px); opacity: 0.08; animation: dd-ray-spin 18s linear infinite; }
@@ -726,8 +797,9 @@ select option { background: var(--navy-2); color: var(--white); }
 }
 
 .final-clue-text {
-  font-family: 'Barlow', 'Arial', sans-serif;
-  font-size: clamp(1.4rem, 3vw, 2.5rem);
+  font-family: 'Gelasio', Georgia, 'Times New Roman', serif;
+  font-weight: 600;
+  font-size: clamp(1.4rem, 3vw, 3.2rem);
   color: var(--white);
   background: linear-gradient(155deg, var(--navy-3) 0%, var(--navy-2) 100%);
   border: 1px solid rgba(255,255,255,0.07);
@@ -762,6 +834,26 @@ select option { background: var(--navy-2); color: var(--white); }
   text-align: center;
   opacity: 0.6;
 }
+
+/* ── Think timer — drains over 30s (duration mirrored in app.js) ── */
+.think-timer {
+  width: min(560px, 90%);
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.think-timer-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-warm), var(--gold-bright));
+  transform-origin: left;
+  animation: think-drain 30s linear forwards;
+}
+@keyframes think-drain {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+.think-timer.done { box-shadow: 0 0 12px rgba(232, 81, 71, 0.3); background: rgba(232, 81, 71, 0.18); }
 
 .wager-grid {
   display: grid;
@@ -970,43 +1062,53 @@ select option { background: var(--navy-2); color: var(--white); }
   font-weight: 600;
 }
 
-/* ── Mute toggle ── */
-#mute-toggle {
-  display: none;
-  position: fixed;
-  bottom: 18px;
-  right: 18px;
-  z-index: 9999;
-  background: rgba(10, 18, 48, 0.9);
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
-  backdrop-filter: blur(8px);
-}
-#mute-toggle:hover { background: rgba(22, 40, 96, 0.95); border-color: rgba(245,197,50,0.4); box-shadow: 0 0 12px rgba(245,197,50,0.18); }
-#mute-toggle.muted { background: rgba(28, 28, 28, 0.9); border-color: rgba(255,255,255,0.08); color: rgba(255,255,255,0.32); }
-
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.001ms !important;
   }
 }
 
 /* ── Responsive ── */
 @media (max-width: 700px) {
-  .board-cell.category { font-size: clamp(0.42rem, 1.8vw, 0.72rem); }
-  #scoreboard { gap: 0.4rem; padding: 0.35rem 0.5rem; }
+  .board-cell.category { font-size: clamp(0.5rem, 2vw, 0.72rem); overflow-wrap: break-word; }
+
+  /* Scoreboard: round label + actions on row 1, chips on their own full-width row */
+  #scoreboard {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    row-gap: 0.45rem;
+    padding: 0.35rem 0.5rem;
+  }
+  #round-label { padding-top: 0; }
+  .scoreboard-actions { flex-direction: row; align-self: center; }
+  #score-players { grid-column: 1 / -1; grid-template-columns: repeat(3, 1fr) !important; }
+
   .score-chip { min-width: 56px; padding: 0.2rem 0.35rem; }
+  .score-name { font-size: 0.6rem; }
   .score-value { font-size: 1.1rem; }
   .btn-large  { font-size: 1.1rem; padding: 0.6em 1.4em; }
+  .clue-box   { padding: 1.5rem 1rem; gap: 1.2rem; }
   :root { --gap: 3px; }
+}
+
+/* ── Touch devices — bigger hit targets ── */
+@media (pointer: coarse) {
+  .score-adj { padding: 5px 10px; font-size: 0.85rem; }
+  .score-chip .score-adj-amt { width: 52px; padding: 4px 2px; font-size: 0.85rem; }
+  .player-row .btn-remove { font-size: 1.6rem; padding: 0 0.5rem; }
+}
+
+/* ── Big screens / TVs — keep the type commanding past laptop sizes ── */
+@media (min-width: 1600px) {
+  .score-value  { font-size: 1.9rem; }
+  .score-name   { font-size: 0.85rem; }
+  #round-label  { font-size: 1rem; }
+  .btn-small    { font-size: 0.9rem; }
+  .score-adj    { font-size: 0.8rem; padding: 2px 7px; }
+  .score-chip .score-adj-amt { width: 48px; font-size: 0.8rem; }
+  #clue-meta    { font-size: 1.1rem; }
 }

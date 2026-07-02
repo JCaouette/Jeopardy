@@ -4,9 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Handley-Thompson Jeopardy</title>
+  <meta name="theme-color" content="#020610">
+  <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="%23060CE9"/><text x="32" y="47" font-family="Impact, Arial Narrow, sans-serif" font-size="42" font-style="italic" font-weight="bold" text-anchor="middle" fill="%23F5C532">J!</text></svg>'>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@600;700&family=Barlow:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@600;700&family=Barlow:wght@600;700&family=Gelasio:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 
@@ -74,7 +77,7 @@
 
     <!-- Board grid -->
     <div id="board-wrap">
-      <div id="board" role="grid" aria-label="Jeopardy board"></div>
+      <div id="board" role="group" aria-label="Jeopardy board"></div>
     </div>
 
   </div>
@@ -119,6 +122,11 @@
     </div>
   </div>
 
+  <!-- ═══════════════════ ROUND SPLASH ═══════════════════ -->
+  <div id="overlay-splash" class="overlay" hidden>
+    <div class="splash-title" id="splash-title" aria-live="polite"></div>
+  </div>
+
   <!-- ═══════════════════ FINAL JEOPARDY SCREEN ═══════════════════ -->
   <div id="screen-final" class="screen">
     <div class="final-wrap">
@@ -138,23 +146,7 @@
     </div>
   </div>
 
-  <button id="mute-toggle" aria-label="Toggle sound" title="Toggle sound"><svg id="mute-icon-on" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg><svg id="mute-icon-off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg></button>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="app.js"></script>
-  <script>
-    window.addEventListener('DOMContentLoaded', function () {
-      document.getElementById('btn-go-home').addEventListener('click', function () {
-        showScreen('home');
-        dom.resumeBanner.classList.remove('hidden');
-      });
-      // Hide mute button (sound removed)
-      document.getElementById('mute-toggle').style.display = 'none';
-      // Silence all sound — replace every Audio method with a no-op
-      ['cellSelect','clueReveal','dailyDouble','correct','wrong',
-       'roundFanfare','winnerFanfare','startThinkMusic','stopThinkMusic'].forEach(function (m) {
-        Audio[m] = function () {};
-      });
-    });
-  </script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

@@ -1,145 +1,5 @@
 'use strict';
 
-const Audio = (() => {
-  let ctx    = null;
-  let muted  = JSON.parse(localStorage.getItem('jp_muted') ?? 'false');
-  let _thinkTimer = null;
-  let _thinkBeat  = 0;
-
-  function getCtx() {
-    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume();
-    return ctx;
-  }
-
-  // Simple one-shot beep (used for click sounds and think-music notes)
-  function beep({ freq = 440, type = 'sine', duration = 0.18, gain = 0.3, decay = 0.12 } = {}) {
-    if (muted) return;
-    const c = getCtx();
-    const osc = c.createOscillator();
-    const vol = c.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, c.currentTime);
-    vol.gain.setValueAtTime(gain, c.currentTime);
-    vol.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration + decay);
-    osc.connect(vol); vol.connect(c.destination);
-    osc.start(c.currentTime); osc.stop(c.currentTime + duration + decay + 0.05);
-  }
-
-  // Precisely-timed note scheduled relative to ctx.currentTime
-  function schedNote(freq, startOffset, dur, gainVal, type = 'triangle') {
-    if (!freq || muted) return;
-    const c = getCtx();
-    const t = c.currentTime + startOffset;
-    const osc = c.createOscillator();
-    const vol = c.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, t);
-    vol.gain.setValueAtTime(0, t);
-    vol.gain.linearRampToValueAtTime(gainVal, t + 0.015);
-    vol.gain.setValueAtTime(gainVal, t + dur - 0.04);
-    vol.gain.linearRampToValueAtTime(0, t + dur);
-    osc.connect(vol); vol.connect(c.destination);
-    osc.start(t); osc.stop(t + dur + 0.05);
-  }
-
-  // Jeopardy! "Think!" theme in Bb major — 0 = rest, ~70 BPM
-  const THINK_BPM   = 70;
-  const THINK_BEAT  = 60000 / THINK_BPM;
-  const THINK_NOTES = [
-    // mm. 1-2  Bb Bb(lo) Bb Db | Bb Ab G  Eb
-    466, 233, 466, 554,   466, 415, 392, 311,
-    // mm. 3-4  Ab Ab(lo) Ab Bb | Ab G  F  Eb
-    415, 208, 415, 466,   415, 392, 349, 311,
-    // mm. 5-6  Bb Bb(lo) Bb Db | Bb F(hi) Eb(hi) Db(hi)
-    466, 233, 466, 554,   466, 698, 622, 554,
-    // mm. 7-8  Bb Ab G  F  | Eb  rest Eb  rest
-    466, 415, 392, 349,   311, 0,  311, 0,
-    // repeat
-    466, 233, 466, 554,   466, 415, 392, 311,
-    415, 208, 415, 466,   415, 392, 349, 311,
-    466, 233, 466, 554,   466, 698, 622, 554,
-    466, 415, 392, 349,   311, 0,  0,   0,
-  ];
-
-  return {
-    isMuted: () => muted,
-    toggleMute() {
-      muted = !muted;
-      localStorage.setItem('jp_muted', JSON.stringify(muted));
-      return muted;
-    },
-
-    cellSelect() {
-      beep({ freq: 660, type: 'triangle', duration: 0.08, gain: 0.2 });
-    },
-
-    clueReveal() {
-      if (muted) return;
-      beep({ freq: 660, type: 'sine', duration: 0.1, gain: 0.18, decay: 0.05 });
-      setTimeout(() => beep({ freq: 880, type: 'sine', duration: 0.12, gain: 0.18, decay: 0.08 }), 80);
-    },
-
-    dailyDouble() {
-      if (muted) return;
-      // Ascending dramatic fanfare
-      [196, 247, 294, 370, 440, 554, 659].forEach((f, i) => {
-        schedNote(f, 0.05 + i * 0.08, 0.14, 0.3, 'sawtooth');
-      });
-      schedNote(880, 0.67, 0.55, 0.35, 'sawtooth');
-    },
-
-    correct() {
-      if (muted) return;
-      schedNote(523,  0.0,  0.14, 0.22);
-      schedNote(659,  0.12, 0.14, 0.22);
-      schedNote(784,  0.24, 0.28, 0.22);
-      schedNote(1047, 0.24, 0.28, 0.12);
-    },
-
-    wrong() {
-      if (muted) return;
-      schedNote(240, 0.0,  0.28, 0.4,  'sawtooth');
-      schedNote(190, 0.18, 0.28, 0.35, 'sawtooth');
-      schedNote(150, 0.34, 0.22, 0.3,  'sawtooth');
-    },
-
-    roundFanfare() {
-      if (muted) return;
-      // "Double Jeopardy!" ascending fanfare
-      [262, 330, 392, 494, 587, 740].forEach((f, i) => {
-        schedNote(f, 0.05 + i * 0.11, 0.18, 0.22);
-      });
-      [466, 587, 698].forEach(f => schedNote(f, 0.82, 0.55, 0.18));
-    },
-
-    winnerFanfare() {
-      if (muted) return;
-      [523, 659, 784, 1047, 784, 1047].forEach((f, i) => {
-        schedNote(f, 0.05 + i * 0.14, 0.2, 0.22);
-      });
-      [523, 659, 784, 1047].forEach(f => schedNote(f, 0.97, 0.8, 0.18));
-    },
-
-    startThinkMusic() {
-      if (muted || _thinkTimer) return;
-      _thinkBeat = 0;
-      _thinkTimer = setInterval(() => {
-        if (muted) { clearInterval(_thinkTimer); _thinkTimer = null; return; }
-        const freq = THINK_NOTES[_thinkBeat % THINK_NOTES.length];
-        if (freq) beep({ freq, type: 'triangle', duration: 0.55, gain: 0.18, decay: 0.15 });
-        _thinkBeat++;
-      }, THINK_BEAT);
-    },
-
-    stopThinkMusic() {
-      clearInterval(_thinkTimer);
-      _thinkTimer = null;
-      _thinkBeat  = 0;
-    },
-  };
-})();
-
 /* ══════════════════════════════════════════════════════════
    PASSWORD GATE  —  PBKDF2-SHA-256
    ══════════════════════════════════════════════════════════ */
@@ -163,7 +23,10 @@ async function checkAuth() {
   const remembered = localStorage.getItem(AUTH_KEY)   === SITE_PASS_HASH;
   const session    = sessionStorage.getItem(AUTH_KEY) === '1';
   if (remembered || session) showScreen('home');
-  else showScreen('password');
+  else {
+    showScreen('password');
+    document.getElementById('pw-input').focus();
+  }
 }
 
 async function handlePasswordSubmit() {
@@ -344,6 +207,15 @@ let finalCorrect = {};          // playerIdx -> true | false | null
 let roundAdvanceConfirm = false;
 let roundAdvanceTimer   = null;
 
+// Render-time element refs (rebuilt whenever the board / scoreboard renders)
+let boardCells      = [];    // boardCells[col][row] -> tile <button>
+let scoreChips      = [];    // playerIdx -> { valEl }
+let lastFocusedCell = null;  // tile that opened the current overlay
+let ddRevealTimer   = null;  // pending "show wager form" timeout
+let scoreAnimSeq    = 0;     // invalidates in-flight score count-ups
+let splashActive    = false; // round splash showing — block re-entry
+let finalThinkTimer = null;  // Final Jeopardy 30s "time's up" timeout
+
 /* ═══════════════════════════════════════════════════════════
    DOM CACHE
    ═══════════════════════════════════════════════════════════ */
@@ -368,8 +240,10 @@ function cacheDOM() {
       final:    document.getElementById('screen-final'),
       winner:   document.getElementById('screen-winner'),
     },
-    overlayClue: document.getElementById('overlay-clue'),
-    overlayDD:   document.getElementById('overlay-dd'),
+    overlayClue:   document.getElementById('overlay-clue'),
+    overlayDD:     document.getElementById('overlay-dd'),
+    overlaySplash: document.getElementById('overlay-splash'),
+    splashTitle:   document.getElementById('splash-title'),
     // Home
     fileUpload:     document.getElementById('file-upload'),
     btnTemplate:    document.getElementById('btn-template'),
@@ -385,6 +259,7 @@ function cacheDOM() {
     roundLabel:   document.getElementById('round-label'),
     scorePlayers: document.getElementById('score-players'),
     btnNextRound: document.getElementById('btn-next-round'),
+    btnGoHome:    document.getElementById('btn-go-home'),
     // Board
     board: document.getElementById('board'),
     // Clue overlay
@@ -434,15 +309,8 @@ function attachListeners() {
   dom.ddPlayerSelect.addEventListener('change', updateDDHint);
   dom.ddWagerInput.addEventListener('input', updateDDHint);
   dom.btnNewGame.addEventListener('click', resetToHome);
-  // Mute toggle
-  const muteBtn = document.getElementById('mute-toggle');
-  const syncMuteIcon = (muted) => {
-    document.getElementById('mute-icon-on').style.display  = muted ? 'none' : '';
-    document.getElementById('mute-icon-off').style.display = muted ? '' : 'none';
-    muteBtn.classList.toggle('muted', muted);
-  };
-  syncMuteIcon(Audio.isMuted());
-  muteBtn.addEventListener('click', () => syncMuteIcon(Audio.toggleMute()));
+  dom.btnGoHome.addEventListener('click', goHome);
+  dom.board.addEventListener('keydown', handleBoardKeydown);
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if (!dom.overlayDD.hidden) cancelDD();
@@ -450,8 +318,29 @@ function attachListeners() {
         if (dom.answerSection.hidden) cancelClue();
         else closeClue();
       }
+    } else if (e.key === 'Tab') {
+      if (!dom.overlayDD.hidden)        trapFocus(dom.overlayDD, e);
+      else if (!dom.overlayClue.hidden) trapFocus(dom.overlayClue, e);
     }
   });
+}
+
+function goHome() {
+  showScreen('home');
+  const inProgress = gameData && players.length > 0
+                  && ['single', 'double', 'final'].includes(currentRound);
+  dom.resumeBanner.classList.toggle('hidden', !inProgress);
+}
+
+// Keep Tab cycling inside an open modal overlay
+function trapFocus(overlay, e) {
+  const focusables = [...overlay.querySelectorAll('button, input, select, [tabindex]:not([tabindex="-1"])')]
+    .filter(el => !el.disabled && el.getClientRects().length > 0);
+  if (!focusables.length) return;
+  const first = focusables[0];
+  const last  = focusables[focusables.length - 1];
+  if (e.shiftKey && document.activeElement === first)      { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -776,9 +665,8 @@ function resumeGame() {
 function goToRound(round) {
   currentRound = round;
   dom.roundLabel.textContent = round === 'single' ? 'SINGLE JEOPARDY' : 'DOUBLE JEOPARDY';
-  if (round === 'double') Audio.roundFanfare();
   renderScoreboard();
-  renderBoard();
+  renderBoard({ animate: true });
   showScreen('game');
   saveState();
 }
@@ -786,34 +674,104 @@ function goToRound(round) {
 /* ═══════════════════════════════════════════════════════════
    BOARD RENDERING
    ═══════════════════════════════════════════════════════════ */
-function renderBoard() {
+function renderBoard({ animate = false } = {}) {
   const data = gameData[currentRound];
   dom.board.innerHTML = '';
+  boardCells = [];
 
   // Row 0 — category headers
-  data.categories.forEach(cat => {
-    dom.board.appendChild(mk('div', 'board-cell category', cat));
+  data.categories.forEach((cat, col) => {
+    const el = mk('div', 'board-cell category', cat);
+    if (animate) { el.classList.add('cascade'); el.style.setProperty('--i', col); }
+    dom.board.appendChild(el);
   });
 
-  // Rows 1–5 — clue cells
+  // Rows 1–5 — clue tiles
   for (let row = 0; row < NQ; row++) {
     for (let col = 0; col < NC; col++) {
-      const key  = `${col}-${row}`;
-      const used = !!usedCells[currentRound][key];
-      const cell = mk('div', 'board-cell clue-cell' + (used ? ' used' : ''));
-      if (!used) {
-        cell.textContent = '$' + data.grid[col][row].value.toLocaleString();
-        cell.setAttribute('role', 'gridcell');
-        cell.setAttribute('tabindex', '0');
+      const used  = !!usedCells[currentRound][`${col}-${row}`];
+      const value = data.grid[col][row].value;
+      const cell  = mk('button', 'board-cell clue-cell' + (used ? ' used' : ''));
+      cell.type        = 'button';
+      cell.dataset.col = col;
+      cell.dataset.row = row;
+      if (used) {
+        cell.disabled = true;
+      } else {
+        cell.textContent = '$' + value.toLocaleString();
+        cell.setAttribute('aria-label', `${data.categories[col]} for $${value.toLocaleString()}`);
         cell.addEventListener('click', () => openClue(col, row));
-        cell.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') openClue(col, row); });
       }
+      if (animate) {
+        cell.classList.add('cascade');
+        cell.style.setProperty('--i', NC + row * NC + col);
+      }
+      (boardCells[col] ??= [])[row] = cell;
       dom.board.appendChild(cell);
     }
   }
+  updateRoundNudge();
+}
+
+// Flip a single tile to its played state without re-rendering the board
+function markCellUsed(col, row) {
+  usedCells[currentRound][`${col}-${row}`] = true;
+  const cell = boardCells[col]?.[row];
+  if (cell) {
+    cell.classList.add('used');
+    cell.classList.remove('cascade');
+    cell.disabled    = true;
+    cell.textContent = '';
+    cell.removeAttribute('aria-label');
+  }
+  updateRoundNudge();
+}
+
+function boardComplete() {
+  return Object.keys(usedCells[currentRound] ?? {}).length >= NC * NQ;
+}
+
+// Pulse the Next Round button once every tile has been played
+function updateRoundNudge() {
+  const done = (currentRound === 'single' || currentRound === 'double') && boardComplete();
+  dom.btnNextRound.classList.toggle('nudge', done);
+}
+
+// Arrow-key navigation between live tiles
+function handleBoardKeydown(e) {
+  const dirs = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  const dir  = dirs[e.key];
+  const from = e.target.closest?.('.clue-cell');
+  if (!dir || !from) return;
+  e.preventDefault();
+  let col = +from.dataset.col;
+  let row = +from.dataset.row;
+  for (;;) {
+    col += dir[0]; row += dir[1];
+    if (col < 0 || col >= NC || row < 0 || row >= NQ) return;
+    const next = boardCells[col]?.[row];
+    if (next && !next.disabled) { next.focus(); return; }
+  }
+}
+
+// After an overlay closes, put keyboard focus back on the board
+function restoreBoardFocus() {
+  if (!dom.screens.game.classList.contains('active')) return;
+  if (lastFocusedCell?.isConnected && !lastFocusedCell.disabled) { lastFocusedCell.focus(); return; }
+  dom.board.querySelector('.clue-cell:not(:disabled)')?.focus();
+}
+
+// Record where the clue overlay should zoom out from
+function setOverlayOrigin(cellEl) {
+  const style = dom.overlayClue.style;
+  if (!cellEl) { style.removeProperty('--dx'); style.removeProperty('--dy'); return; }
+  const r = cellEl.getBoundingClientRect();
+  style.setProperty('--dx', `${Math.round(r.left + r.width / 2 - window.innerWidth / 2)}px`);
+  style.setProperty('--dy', `${Math.round(r.top + r.height / 2 - window.innerHeight / 2)}px`);
 }
 
 function advanceRound() {
+  if (splashActive) return;
   if (!roundAdvanceConfirm) {
     roundAdvanceConfirm = true;
     const nextLabel = currentRound === 'single' ? 'DOUBLE JEOPARDY?' : 'FINAL JEOPARDY?';
@@ -830,8 +788,26 @@ function advanceRound() {
   roundAdvanceConfirm = false;
   dom.btnNextRound.textContent = 'Next Round →';
   dom.btnNextRound.classList.replace('btn-gold', 'btn-outline');
-  if (currentRound === 'single') goToRound('double');
-  else startFinal();
+  if (currentRound === 'single') {
+    showRoundSplash('DOUBLE<br><span class="gold-em">JEOPARDY!</span>', () => goToRound('double'));
+  } else {
+    showRoundSplash('FINAL<br><span class="gold-em">JEOPARDY!</span>', startFinal);
+  }
+}
+
+// Full-screen interstitial between rounds; runs `next` after it fades out
+function showRoundSplash(titleHTML, next) {
+  splashActive = true;
+  dom.splashTitle.innerHTML = titleHTML;  // static markup, never user content
+  dom.overlaySplash.classList.remove('splash-out');
+  dom.overlaySplash.hidden = false;
+  setTimeout(() => dom.overlaySplash.classList.add('splash-out'), 1250);
+  setTimeout(() => {
+    dom.overlaySplash.hidden = true;
+    dom.overlaySplash.classList.remove('splash-out');
+    splashActive = false;
+    next();
+  }, 1600);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -842,8 +818,10 @@ function openClue(col, row) {
   activeClue   = { col, row, ...cell };
   clueMarks    = {};
   scoreSnapshot = players.map(p => p.score);
+  lastFocusedCell = boardCells[col]?.[row] ?? null;
+  setOverlayOrigin(lastFocusedCell);
+  if (lastFocusedCell) lastFocusedCell.textContent = '';  // tile empties as the clue zooms out of it
 
-  Audio.cellSelect();
   if (cell.dd) openDailyDouble();
   else         showClueOverlay();
 }
@@ -865,7 +843,6 @@ function showClueOverlay() {
   dom.overlayDD.hidden   = true;
   dom.overlayClue.hidden = false;
   dom.btnReveal.focus();
-  Audio.clueReveal();
 }
 
 function revealAnswer() {
@@ -914,10 +891,8 @@ function makeMarkBtn(label, cls, onClick) {
 
 function toggleMark(playerIdx, mark) {
   clueMarks[playerIdx] = clueMarks[playerIdx] === mark ? null : mark;
-  if      (clueMarks[playerIdx] === 'correct') Audio.correct();
-  else if (clueMarks[playerIdx] === 'wrong')   Audio.wrong();
   applyMarksFromSnapshot();
-  renderScoreboard();
+  updateScores();
   refreshMarkButtonStates();
 }
 
@@ -941,22 +916,29 @@ function refreshMarkButtonStates() {
 }
 
 function cancelClue() {
-  Audio.stopThinkMusic();
+  restoreActiveTile();
   activeClue    = null;
   clueMarks     = {};
   scoreSnapshot = [];
   dom.overlayClue.hidden = true;
+  restoreBoardFocus();
+}
+
+// Put the dollar value back on a tile whose clue was cancelled
+function restoreActiveTile() {
+  if (activeClue && lastFocusedCell && !lastFocusedCell.disabled) {
+    lastFocusedCell.textContent = '$' + activeClue.value.toLocaleString();
+  }
 }
 
 function closeClue() {
-  Audio.stopThinkMusic();
   if (activeClue) {
-    usedCells[currentRound][`${activeClue.col}-${activeClue.row}`] = true;
+    markCellUsed(activeClue.col, activeClue.row);
     activeClue = null;
   }
   dom.overlayClue.hidden = true;
-  renderBoard();
-  renderScoreboard();
+  updateScores();
+  restoreBoardFocus();
   saveState();
 }
 
@@ -964,14 +946,16 @@ function closeClue() {
    DAILY DOUBLE
    ═══════════════════════════════════════════════════════════ */
 function cancelDD() {
+  clearTimeout(ddRevealTimer);
+  restoreActiveTile();
   activeClue    = null;
   clueMarks     = {};
   scoreSnapshot = [];
   dom.overlayDD.hidden = true;
+  restoreBoardFocus();
 }
 
 function openDailyDouble() {
-  Audio.dailyDouble();
   // Populate player select
   dom.ddPlayerSelect.innerHTML = '';
   players.forEach((p, i) => {
@@ -984,12 +968,13 @@ function openDailyDouble() {
   dom.ddForm.hidden      = true;
   dom.overlayDD.hidden   = false;
 
-  // Show "DAILY DOUBLE!" for 1.5 s before revealing the wager form
-  setTimeout(() => {
+  // Show "DAILY DOUBLE!" for a beat before revealing the wager form
+  clearTimeout(ddRevealTimer);
+  ddRevealTimer = setTimeout(() => {
     dom.ddForm.hidden = false;
     updateDDHint();
     dom.ddWagerInput.focus();
-  }, 1500);
+  }, 1400);
 }
 
 function ddMaxWager(playerIdx) {
@@ -1025,6 +1010,7 @@ function confirmDD() {
    ═══════════════════════════════════════════════════════════ */
 function renderScoreboard() {
   dom.scorePlayers.innerHTML = '';
+  scoreChips = [];
   const n = players.length;
 
   // Balanced column count: every row gets the same number of chips
@@ -1039,24 +1025,28 @@ function renderScoreboard() {
   players.forEach((p, i) => {
     const chip = mk('div', 'score-chip');
     chip.appendChild(mk('div', 'score-name', p.name));
-    const valEl = mk('div', p.score < 0 ? 'score-value negative' : 'score-value',
-      (p.score < 0 ? '-$' : '$') + Math.abs(p.score).toLocaleString());
+    const valEl = mk('div', 'score-value' + (p.score < 0 ? ' negative' : ''), fmtScore(p.score));
+    valEl.dataset.score = p.score;
     chip.appendChild(valEl);
 
     const ctrl  = mk('div', 'score-controls');
     const minus = mk('button', 'score-adj', '−');
+    minus.setAttribute('aria-label', `Subtract from ${p.name}`);
     const amtIn = document.createElement('input');
     amtIn.type = 'number'; amtIn.className = 'score-adj-amt';
     amtIn.value = 200; amtIn.min = 0;
     amtIn.setAttribute('aria-label', 'Adjustment amount');
     const plus  = mk('button', 'score-adj', '+');
+    plus.setAttribute('aria-label', `Add to ${p.name}`);
 
     minus.addEventListener('click', () => adjustScore(i, -(parseInt(amtIn.value) || 0)));
     plus.addEventListener('click',  () => adjustScore(i, +(parseInt(amtIn.value) || 0)));
     ctrl.append(minus, amtIn, plus);
     chip.appendChild(ctrl);
+    scoreChips[i] = { valEl, chip };
     dom.scorePlayers.appendChild(chip);
   });
+  updateLeader();
 
   // Invisible spacers so the last row has the same number of cells as every other row
   const remainder = n % cols;
@@ -1067,11 +1057,63 @@ function renderScoreboard() {
   }
 }
 
+function fmtScore(s) {
+  return (s < 0 ? '-$' : '$') + Math.abs(s).toLocaleString();
+}
+
+// Refresh score chips in place — changed values count up/down with a flash
+function updateScores() {
+  players.forEach((p, i) => {
+    const ref = scoreChips[i];
+    if (!ref) return;
+    const prev = parseInt(ref.valEl.dataset.score, 10) || 0;
+    if (prev === p.score) return;
+    ref.valEl.dataset.score = p.score;
+    animateScore(ref.valEl, prev, p.score);
+  });
+  updateLeader();
+}
+
+// Gold edge on the current leader(s) — only once someone is above $0
+function updateLeader() {
+  const max = Math.max(...players.map(p => p.score));
+  players.forEach((p, i) => {
+    scoreChips[i]?.chip.classList.toggle('leader', max > 0 && p.score === max);
+  });
+}
+
+function animateScore(el, from, to) {
+  el.classList.remove('bump-up', 'bump-down');
+  void el.offsetWidth; // restart the CSS bump animation
+  el.classList.add(to > from ? 'bump-up' : 'bump-down');
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    el.textContent = fmtScore(to);
+    el.classList.toggle('negative', to < 0);
+    return;
+  }
+
+  const token = ++scoreAnimSeq;
+  el.dataset.animToken = token;
+  const DUR = 380;
+  const t0  = performance.now();
+  (function step(now) {
+    if (el.dataset.animToken !== String(token)) return; // superseded by a newer change
+    const t     = Math.min(1, (now - t0) / DUR);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const val   = Math.round(from + (to - from) * eased);
+    el.textContent = fmtScore(val);
+    el.classList.toggle('negative', val < 0);
+    if (t < 1) requestAnimationFrame(step);
+  })(t0);
+}
+
 function adjustScore(playerIdx, delta) {
+  if (!delta) return;
   players[playerIdx].score += delta;
   // Keep snapshot in sync so live mark toggling stays accurate
   if (scoreSnapshot.length > playerIdx) scoreSnapshot[playerIdx] += delta;
-  renderScoreboard();
+  updateScores();
   saveState();
 }
 
@@ -1089,6 +1131,7 @@ function startFinal() {
 }
 
 function renderFinalPhase() {
+  clearTimeout(finalThinkTimer);  // leaving the clue phase kills the "time's up" callback
   const f   = gameData.final;
   const div = dom.finalContent;
   div.innerHTML = '';
@@ -1115,6 +1158,9 @@ function renderFinalPhase() {
       inp.addEventListener('input', () => {
         finalWagers[i] = Math.max(0, Math.min(parseInt(inp.value) || 0, maxW));
       });
+      inp.addEventListener('blur', () => {
+        if (inp.value !== '') inp.value = finalWagers[i] ?? 0;  // show the clamped wager
+      });
       item.append(lbl, hint, inp);
       grid.appendChild(item);
     });
@@ -1123,16 +1169,24 @@ function renderFinalPhase() {
       btn('Show Clue →', 'btn btn-gold btn-large', () => {
         players.forEach((_, i) => { if (finalWagers[i] == null) finalWagers[i] = 0; });
         finalPhase = 'clue'; renderFinalPhase();
-        Audio.startThinkMusic();
       }),
     );
 
   } else if (finalPhase === 'clue') {
+    const timer = mk('div', 'think-timer');
+    timer.appendChild(mk('div', 'think-timer-fill'));
+    const hint = mk('div', 'final-hint', 'Players — write down your answers now!');
     div.append(
       mk('div', 'final-clue-text', f.clue),
-      mk('div', 'final-hint', 'Players — write down your answers now!'),
-      btn('Reveal Answer →', 'btn btn-gold btn-large', () => { Audio.stopThinkMusic(); finalPhase = 'answer'; renderFinalPhase(); }),
+      timer,
+      hint,
+      btn('Reveal Answer →', 'btn btn-gold btn-large', () => { finalPhase = 'answer'; renderFinalPhase(); }),
     );
+    // Matches the 30s CSS think-drain animation on .think-timer-fill
+    finalThinkTimer = setTimeout(() => {
+      timer.classList.add('done');
+      hint.textContent = 'Time’s up — pens down!';
+    }, 30_000);
 
   } else if (finalPhase === 'answer') {
     div.append(
@@ -1176,8 +1230,8 @@ function toggleFinalMark(playerIdx, isCorrect) {
     finalCorrect[playerIdx] = null;
   } else {
     finalCorrect[playerIdx] = isCorrect;
-    if (isCorrect) { players[playerIdx].score += wager; Audio.correct(); }
-    else           { players[playerIdx].score -= wager; Audio.wrong(); }
+    if (isCorrect) players[playerIdx].score += wager;
+    else           players[playerIdx].score -= wager;
   }
   saveState();
 }
@@ -1187,15 +1241,18 @@ function toggleFinalMark(playerIdx, isCorrect) {
    ═══════════════════════════════════════════════════════════ */
 function showWinner() {
   currentRound = 'done';
-  Audio.winnerFanfare();
   saveState();
 
   const sorted = [...players].sort((a, b) => b.score - a.score);
   dom.winnerList.innerHTML = '';
+  let lastScore = null;
+  let lastRank  = 0;
   sorted.forEach((p, i) => {
-    const rank  = i + 1;
-    const row   = mk('div', 'winner-row');
-    const rEl   = mk('div', `winner-rank rank-${rank}`, rank);
+    const rank = p.score === lastScore ? lastRank : i + 1;  // ties share a rank
+    lastScore  = p.score;
+    lastRank   = rank;
+    const row  = mk('div', `winner-row rank-${rank}`);
+    const rEl  = mk('div', `winner-rank rank-${rank}`, rank);
     const nEl   = mk('div', 'winner-name', p.name);
     const sEl   = mk('div', p.score < 0 ? 'winner-score negative' : 'winner-score',
       (p.score < 0 ? '-$' : '$') + Math.abs(p.score).toLocaleString());
